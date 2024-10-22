@@ -45,7 +45,12 @@ class GoogleMapsScraper:
         return True
 
     def sort_by(self, url, ind):
-
+        print(f"Original URL: {url}")
+        if 'cid=' in url or 'consent.google.com' in url or '/maps/place/' not in url:
+            print("CID, consent URL, or non-standard URL detected. Attempting to get full URL...")
+            url = self.get_full_url_from_cid(url)
+        print(f"URL being used for sorting: {url}")
+        
         self.driver.get(url)
         self.__click_on_cookie_agreement()
 
@@ -400,3 +405,70 @@ class GoogleMapsScraper:
     def __filter_string(self, str):
         strOut = str.replace('\r', ' ').replace('\n', ' ').replace('\t', ' ')
         return strOut
+
+    def get_full_url_from_cid(self, cid_url, max_redirects=5):
+        print(f"Attempting to get full URL from CID URL: {cid_url}")
+        self.driver.get(cid_url)
+        print(f"Initial page loaded. Current URL: {self.driver.current_url}")
+        
+        redirect_count = 0
+        while redirect_count < max_redirects:
+            current_url = self.driver.current_url
+            print(f"Current URL (redirect {redirect_count}): {current_url}")
+            
+            if 'consent.google.com' in current_url:
+                print("Consent page detected. Attempting to handle...")
+                if not self.handle_consent_page():
+                    print("Failed to handle consent page. Proceeding with current URL.")
+            
+            try:
+                # Wait for any potential redirect
+                WebDriverWait(self.driver, MAX_WAIT).until(EC.url_changes(current_url))
+                new_url = self.driver.current_url
+                print(f"URL changed to: {new_url}")
+                
+                if new_url == current_url:
+                    print("No further redirection detected.")
+                    break
+                
+                if '/maps/place/' in new_url:
+                    print("Reached final Google Maps URL.")
+                    break
+            except Exception as e:
+                print(f"No further redirection detected. Error: {str(e)}")
+                break
+            
+            redirect_count += 1
+        
+        final_url = self.driver.current_url
+        print(f"Final URL after redirection attempts: {final_url}")
+        
+        if '/maps/place/' not in final_url:
+            print("Warning: Final URL does not contain '/maps/place/'. It may not be the correct Google Maps URL.")
+        
+        return final_url
+
+    def handle_consent_page(self):
+        try:
+            # Try to find and click the "Reject all" button
+            reject_button = WebDriverWait(self.driver, MAX_WAIT).until(
+                EC.element_to_be_clickable((By.XPATH, '//button[contains(., "Reject all")]'))
+            )
+            reject_button.click()
+            print("Clicked 'Reject all' on consent page")
+            return True
+        except Exception as e:
+            print(f"Error handling consent page: {str(e)}")
+            print("Attempting to find any clickable button...")
+            try:
+                # If "Reject all" is not found, try to find any button and click it
+                any_button = WebDriverWait(self.driver, MAX_WAIT).until(
+                    EC.element_to_be_clickable((By.XPATH, '//button'))
+                )
+                any_button.click()
+                print("Clicked a button on consent page")
+                return True
+            except Exception as e2:
+                print(f"Failed to find any clickable button: {str(e2)}")
+                return False
+

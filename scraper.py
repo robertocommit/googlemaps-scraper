@@ -43,32 +43,33 @@ if __name__ == '__main__':
     with GoogleMapsScraper(debug=args.debug) as scraper:
         with open(args.i, 'r') as urls_file:
             for url in urls_file:
+                url = url.strip()  # Remove any whitespace or newline characters
+                print(f"Processing URL: {url}")
                 if args.place:
                     print(scraper.get_account(url))
                 else:
+                    if 'cid=' in url:
+                        print("CID detected in URL. Getting full URL...")
+                        url = scraper.get_full_url_from_cid(url)
+                    print(f"Sorting reviews for URL: {url}")
                     error = scraper.sort_by(url, ind[args.sort_by])
 
                     if error == 0:
-
                         n = 0
 
-                        #if ind[args.sort_by] == 0:
-                        #    scraper.more_reviews()
-
                         while n < args.N:
-
-                            # logging to std out
-                            print(colored('[Review ' + str(n) + ']', 'cyan'))
-
+                            print(colored(f'[Review {n}]', 'cyan'))
                             reviews = scraper.get_reviews(n)
                             if len(reviews) == 0:
+                                print("No more reviews found.")
                                 break
 
                             for r in reviews:
                                 row_data = list(r.values())
                                 if args.source:
-                                    row_data.append(url[:-1])
-
+                                    row_data.append(url)
                                 writer.writerow(row_data)
 
                             n += len(reviews)
+                    else:
+                        print(f"Error occurred while sorting reviews. Error code: {error}")
