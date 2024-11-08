@@ -8,19 +8,16 @@ import time
 
 
 ind = {'most_relevant' : 0 , 'newest' : 1, 'highest_rating' : 2, 'lowest_rating' : 3 }
-HEADER = ['id_review', 'caption', 'relative_date', 'retrieval_date', 'rating', 'username', 'n_review_user', 'n_photo_user', 'url_user']
-HEADER_W_SOURCE = ['id_review', 'caption', 'relative_date','retrieval_date', 'rating', 'username', 'n_review_user', 'n_photo_user', 'url_user', 'url_source']
+HEADER = ['id_review', 'caption', 'relative_date', 'retrieval_date', 'rating', 'username', 'n_review_user', 'n_photo_user', 'url_user', 'source_url']
+HEADER_W_SOURCE = ['id_review', 'caption', 'relative_date','retrieval_date', 'rating', 'username', 'n_review_user', 'n_photo_user', 'url_user', 'url_source', 'source_url']
 
 def csv_writer(source_field, ind_sort_by, outpath):
     targetfile = open('data/' + outpath, mode='w', encoding='utf-8', newline='\n')
-    writer = csv.writer(targetfile, quoting=csv.QUOTE_MINIMAL)
-
-    if source_field:
-        h = HEADER_W_SOURCE
-    else:
-        h = HEADER
-    writer.writerow(h)
-
+    writer = csv.writer(targetfile, 
+                       quoting=csv.QUOTE_ALL,  # Quote all fields
+                       escapechar='\\',        # Use backslash as escape character
+                       doublequote=True)       # Double quotes within fields
+    writer.writerow(HEADER)
     return writer
 
 
@@ -45,11 +42,12 @@ if __name__ == '__main__':
             for url in urls_file:
                 url = url.strip()  # Remove any whitespace or newline characters
                 print(f"Processing URL: {url}")
+                source_url = url  # Store the original URL
                 if args.place:
                     print(scraper.get_account(url))
                 else:
-                    if 'cid=' in url:
-                        print("CID detected in URL. Getting full URL...")
+                    if 'cid=' in url or 'consent.google.com' in url or '/maps/place/' not in url:
+                        print("CID, consent URL, or non-standard URL detected. Attempting to get full URL...")
                         url = scraper.get_full_url_from_cid(url)
                     print(f"Sorting reviews for URL: {url}")
                     error = scraper.sort_by(url, ind[args.sort_by])
@@ -66,8 +64,7 @@ if __name__ == '__main__':
 
                             for r in reviews:
                                 row_data = list(r.values())
-                                if args.source:
-                                    row_data.append(url)
+                                row_data.append(source_url)  # Add the source URL to each review
                                 writer.writerow(row_data)
 
                             n += len(reviews)
